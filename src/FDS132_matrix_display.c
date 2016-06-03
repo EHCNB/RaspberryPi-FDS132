@@ -36,7 +36,7 @@ Start GPL license:
 Compile this source with:
  gcc -O2 -Wall -o FDS132_matrix_display FDS132_matrix_display.c ; strip FDS132_matrix_display
 
-Install (as root, erhaps use sudo)
+Install (as root, perhaps use sudo)
  cp FDS132_matrix_display /usr/local/bin/
  
 */
@@ -1250,6 +1250,13 @@ unsigned gpioHardwareRevision(void)
                   piBusAddr = 0x40000000;
                }
                else if (strstr (buf, "ARMv7") != NULL)
+               {
+                  piModel = 2;
+                  chars = 6;
+                  piPeriphBase = 0x3F000000;
+                  piBusAddr = 0xC0000000;
+               }
+               else if (strstr (buf, "ARMv8") != NULL)
                {
                   piModel = 2;
                   chars = 6;
