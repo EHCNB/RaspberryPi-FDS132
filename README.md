@@ -7,9 +7,10 @@ the version of the Raspberry Pi.
 
 This has been tested on the Rapsberry Pi B, Raspberry Pi 2 model B and Raspberry Pi 3 model B. 
 
-The following table makes connecting the pins a bit easier. Newer models usually have 40-pins.
+The following table makes connecting the pins a bit easier. Newer models have 40-pins, older have 26 pins. 
+The numbering on both connections is the same. 
 
-| Pin          | GPIO pin | pin  |
+| Pin          | GPIO pin | pin connection |
 |---|---|---|
 | strobe       | GPIO8  | 24 |
 | data         | GPIO9  | 21 |
