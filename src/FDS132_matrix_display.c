@@ -42,7 +42,7 @@ Install (as root, perhaps use sudo)
 */
 
 
-#define PROGRAM_VERSION 	"0.4.3"
+#define PROGRAM_VERSION 	"0.4.4"
 
 
 /*
@@ -86,6 +86,10 @@ Added up and down scroll modes (-u flag).
 Added form feed cls processing.
 Added -w flag, programmable delay after 3 lines scroll, can be used as sort of a form feed.
 Added snow and fireworks effects (-x flag).
+
+0.4.4
+Added support for PI2 and PI3
+Added support for locale date formatting
 */
 
 
@@ -102,6 +106,7 @@ Added snow and fireworks effects (-x flag).
 #include <getopt.h>
 #include <ctype.h>
 #include <time.h>
+#include <locale.h>
 //#include <math.h>
 
 
@@ -1719,6 +1724,9 @@ while(1)
 time_t now;
 struct tm *local_time;
 char temp[1024];
+
+// Make sure the environments locale is used
+setlocale(LC_TIME, "");
 
 loop_counter = 0;
 while(1)
