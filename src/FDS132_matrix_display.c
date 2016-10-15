@@ -1,10 +1,10 @@
- 
+
 /*
 FDS132_matrix_display.c
 
 Raspberry Pi version B via GPIO driving a FDS132  LED matrix display.
 On the display print the CPLD has been removed.
- 
+
 Copyright Jan Panteltje 2013-always
 
 Released under GPL.
@@ -16,12 +16,12 @@ Start GPL license:
     it under the terms of the GNU General Public License as published by
     the Free Software Foundation; either version 2 of the License, or
     (at your option) any later version.
-    
+
     This program is distributed in the hope that it will be useful,
     but WITHOUT ANY WARRANTY; without even the implied warranty of
     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
     GNU General Public License for more details.
-    
+
     You should have received a copy of the GNU General Public License
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -38,11 +38,11 @@ Compile this source with:
 
 Install (as root, perhaps use sudo)
  cp FDS132_matrix_display /usr/local/bin/
- 
+
 */
 
 
-#define PROGRAM_VERSION 	"0.4.4"
+#define PROGRAM_VERSION 	"0.4.5"
 
 
 /*
@@ -90,6 +90,10 @@ Added snow and fireworks effects (-x flag).
 0.4.4
 Added support for PI2 and PI3
 Added support for locale date formatting
+
+0.4.5
+Added support for reading a file (-f) and reading updates from that file after -q seconds interval
+Moved the i, l and : a bit more to the middle of the character space
 */
 
 
@@ -193,7 +197,7 @@ static unsigned char matrixfont[128 * MATRIX_CHAR_HEIGHT]=
 0b00000000,
 0b00000000,
 0b00000000,
-/* 8 ^H */ 
+/* 8 ^H */
 0b00000000,
 0b00000000,
 0b00000000,
@@ -588,11 +592,11 @@ static unsigned char matrixfont[128 * MATRIX_CHAR_HEIGHT]=
 0b00111000,
 /* 57 9 */
 0b00000000,
-0b01100000,
-0b01100000,
+0b00011000,
+0b00011000,
 0b00000000,
-0b01100000,
-0b01100000,
+0b00011000,
+0b00011000,
 0b00000000,
 /* 58 : */
 0b00000000,
@@ -971,13 +975,13 @@ static unsigned char matrixfont[128 * MATRIX_CHAR_HEIGHT]=
 0b00100000,
 0b01110000,
 /* 105 i */
-0b00010000,
+0b00001000,
 0b00000000,
+0b00011000,
+0b00001000,
+0b00001000,
+0b00001000,
 0b00110000,
-0b00010000,
-0b00010000,
-0b00010000,
-0b01100000,
 /* 106 j */
 0b01000000,
 0b01000000,
@@ -987,13 +991,13 @@ static unsigned char matrixfont[128 * MATRIX_CHAR_HEIGHT]=
 0b01010000,
 0b01001000,
 /* 107 k */
-0b01000000,
-0b01000000,
-0b01000000,
-0b01000000,
-0b01000000,
-0b01000000,
-0b01000000,
+0b00010000,
+0b00010000,
+0b00010000,
+0b00010000,
+0b00010000,
+0b00010000,
+0b00010000,
 /* 108 l */
 0b00000000,
 0b00000000,
@@ -1169,7 +1173,7 @@ free:
 		GPIO_11		pin 23
 		GPIO_2		pin  3
 		GPIO_3		pin  5
-		GPIO_4		pin	 7	
+		GPIO_4		pin	 7
 		GPIO_2		pin  3
 		GPIO_17		pin 11
 		GPIO_14		pin  8
@@ -1309,7 +1313,7 @@ for(i = 0; i < delays; i++)
 	/* some delay */
 	feof(stdin);
 	}
-	
+
 } /* end function io_delay */
 
 
@@ -1384,7 +1388,7 @@ io_delay(IO_DELAY);
 
 } /* end function row_select_a_low */
 
-	
+
 
 void row_select_b_high()
 {
@@ -1397,7 +1401,7 @@ io_delay(IO_DELAY);
 
 void row_select_b_low()
 {
-*(gpio + 10) =  MATRIX_ROW_SELECT_B; 
+*(gpio + 10) =  MATRIX_ROW_SELECT_B;
 io_delay(IO_DELAY);
 
 } /* end function row_select_b_low */
@@ -1470,6 +1474,8 @@ Usage:\nmatrix_diplay [-e] [-h] [-l] [-v] [t]\n\
 -h            help (this help).\n\
 -s int        scroll delay, default 40.\n\
 -t text       text to display.\n\
+-f file       file to read and display.\n\
+-q int        seconds between file checks.\n\
 -u int        scroll mode:\n\
                 0 horizontal left.\n\
                 1 vertically up.\n\
@@ -1524,18 +1530,21 @@ int loop_counter;
 int exit_on_eof_flag;
 int text_flag;
 int date_flag;
+int file_flag;
 int scroll_delay;
 int scroll_mode;
 int three_line_delay;
 int line_cnt;
 int effect_mode;
 int input_line_cnt;
+int file_read_frequency;
+char filename[] = "";
 float fa;
 char fireworks_landscape[] = 	" * **  * *"; // landscape on bottom line, 15 characters wide, the control B is a christmass tree, use hexedit for example to make these strings
 char snow_landscape[] = 		" * **  * *";
 //int get_temperature_flag;
 //int temperature;
-//FILE *fptr;
+FILE *fptr;
 
 
 setbuf(stdout, NULL);
@@ -1554,7 +1563,7 @@ setup_io();
 GPIO	header Pin
 2		3
 3		5
-4		7		
+4		7
 7		26
 8		24
 9		21
@@ -1578,6 +1587,7 @@ verbose = 0;
 exit_on_eof_flag = 0;
 text_flag = 0;
 date_flag = 0;
+file_flag = 0;
 scroll_delay = 40;
 three_line_delay = 0;
 line_cnt = 0;
@@ -1585,6 +1595,7 @@ line_cnt = 0;
 scroll_mode = SCROLL_LEFT;
 effect_mode = EFFECT_OFF;
 input_line_cnt = 0;
+file_read_frequency = 10;
 
 /* end defaults */
 
@@ -1592,7 +1603,7 @@ input_line_cnt = 0;
 /* proces any command line arguments */
 while(1)
 	{
-	a = getopt(argc, argv, "cdehs:u:vw:t:x:");
+	a = getopt(argc, argv, "cdehs:u:vw:t:x:f:q:");
 	if(a == -1) break;
 
 	switch(a)
@@ -1606,10 +1617,17 @@ while(1)
 		case 'e': // exit on EOF
 			exit_on_eof_flag = 1;
 			break;
+    case 'f':
+      file_flag = 1;
+      strncpy(filename, optarg, 20);
+      break;
 		case 'h': // help
 			print_usage();
 			exit(1);
 			break;
+    case 'q':
+      file_read_frequency = atoi(optarg);
+      break;
 		case 's': // scroll delay
 			scroll_delay = atoi(optarg);
 			break;
@@ -1622,7 +1640,7 @@ while(1)
 			if( (a < 0) || (a > SCROLL_DOWN) )
 				{
 				print_usage();
-				
+
 				exit(1);
 				}
 			scroll_mode = a;
@@ -1633,7 +1651,7 @@ while(1)
 		case 'w':// time to wait after 3 lines displayed
 			three_line_delay = atoi(optarg);
 			break;
- 		case 'x': // special effect mode 
+ 		case 'x': // special effect mode
 			effect_mode = atoi(optarg);
 			break;
         case -1:
@@ -1650,7 +1668,7 @@ while(1)
 			print_usage();
 
 			exit(1);
-			break;			
+			break;
 		default:
 			print_usage();
 			exit(1);
@@ -1715,53 +1733,56 @@ while(1)
 	{
 	*(gpio + 7) = a;
 	usleep(100);
-	*(gpio + 10) = a;	
+	*(gpio + 10) = a;
 	usleep(100);
 	}
 #endif // IO_TEST
 
 
 time_t now;
+time_t previous_file_read;
 struct tm *local_time;
 char temp[1024];
 
 // Make sure the environments locale is used
 setlocale(LC_TIME, "");
 
+// Make sure the file gets read directly (when the file_flag is set)
+previous_file_read = time(0) - file_read_frequency - 1;
+
 loop_counter = 0;
 while(1)
 	{
 	// add text
-
+  now = time(0);
+  local_time = localtime(&now);
+  // printf("Now: [%ld]\n", now);
 	if(date_flag)
 		{
-		now = time(0);
-		local_time = localtime(&now);
 		strftime(temp, 511, "  %d %m %Y      %H:%M:%S       %A    ", local_time);
-//		strftime(temp, 511, " %d %m %Y  %H:%M:%S", local_time);
-		
 		strcpy(text, temp);
 
-/*
-		if(get_temperature_flag)
-			{
-			fptr = fopen("/tmp/temperature", "r");
-			if(fptr)
-				{
-				fscanf(fptr, "%d", &temperature);
-				
-				fclose(fptr);
-				}
-
-			sprintf(temp, "      %d%cC              ", temperature, 96);
-			strcat(text, temp);
-			}
-*/
-
-
-//fprintf(stderr, "%s\n", temp);
 		}
 
+    if ( file_flag ) {
+      if ( now > ( previous_file_read + file_read_frequency)) {
+        // fprintf(stderr, "Reading file\n");
+        // read file
+        fptr = fopen(filename, "r");
+        if ( fptr )  {
+          // Remove the current text
+          memset(&text[0], 0, sizeof(text));
+          // read until (and strip) the first \n
+          fscanf(fptr, "%[^\n]\n", text);
+          fclose(fptr);
+        } else {
+          fprintf(stderr, "Unable to open the file for reading\n");
+          return 1;
+        }
+        previous_file_read = now;
+      }
+    }
+            // fprintf(stderr, "Text is [%s]\n", text);
 	/*
 	The FDS132 has 3 rows of 18  5x7 matrix displays.
 	This makes horizontal 18 x 5 = 90 bits
@@ -1780,7 +1801,7 @@ while(1)
 		// set row select lines
 		if(row & 1) row_select_a_high();
 		else		row_select_a_low();
-	
+
 		if(row & 2) row_select_b_high();
 		else 		row_select_b_low();
 
@@ -1789,7 +1810,7 @@ while(1)
 
 
 		// fix for hardware row counting
-		if(row == 6) r = 0; 
+		if(row == 6) r = 0;
 		else r = row + 1;
 
 
@@ -1804,11 +1825,11 @@ while(1)
 				if(c > 127) c = 0; // subsitute non ASCII with blanks
 
 				bit = (matrixfont[ (c * MATRIX_CHAR_HEIGHT) + r ] >> k) & 1;
-				
+
 				// set shift register data input
 				if(bit) so_h();
 				else so_l();
-				
+
 				// toggle shift register clock
 				sck_h();
 				sck_l();
@@ -1840,7 +1861,7 @@ while(1)
 			/* create a landscape on the bottom line */
 			for(j = 0; j < 15; j++)
 				{
-				text[j + 30] = fireworks_landscape[j];			
+				text[j + 30] = fireworks_landscape[j];
 				}
 
 			input_line_cnt++;
@@ -1853,7 +1874,7 @@ while(1)
 
 					if(fa > (RAND_MAX / 16) )
 						text[j + 15] = ' ';
-					else 
+					else
 						text[j + 15] = 4;
 					}
 				}
@@ -1873,13 +1894,13 @@ while(1)
 
 					/* clear second line */
 					text[j + 15] = 0;
-					}		
-				
+					}
+
 				input_line_cnt = 0;
 				}
 
-			}		
-		
+			}
+
 		continue;
 
 		} /* end if EFFECT_FIREWORKS */
@@ -1888,10 +1909,10 @@ while(1)
 		/* create a landscape on the bottom line */
 		for(j = 0; j < 15; j++)
 			{
-			text[j + 30] = snow_landscape[j];			
+			text[j + 30] = snow_landscape[j];
 			}
 
-		if(loop_counter == scroll_delay)		
+		if(loop_counter == scroll_delay)
 			{
 			loop_counter = 0;
 
@@ -1902,8 +1923,8 @@ while(1)
 
 				/* clear to line */
 				text[j] = ' ';
-				}		
-				
+				}
+
 			/* generate random snow on top line */
 			for(j = 0; j < 15; j++)
 				{
@@ -1911,21 +1932,21 @@ while(1)
 
 				if(fa > (RAND_MAX / 2) )
 					text[j]  = ' ';
-				else 
+				else
 					text[j] = '*';
 				}
 
-			}		
-		
+			}
+
 		continue;
 		} /* end if EFFECT_SNOW */
 
-	/* end special effects */	
+	/* end special effects */
 
-		
+
 	if(date_flag) continue;
 	if(text_flag) continue;
-
+  if(file_flag) continue;
 
 	// when time process any scrolling, v or h
 
@@ -1941,7 +1962,7 @@ while(1)
 		loop_counter = 0;
 
 		if(scroll_mode == SCROLL_UP) // vertical scroll up
-			{		
+			{
 			/* copy up one line, make space */
 			for(i = 0; i < 30; i++)
 				{
@@ -1950,7 +1971,7 @@ while(1)
 
 			/* read in new bottom line */
 			// clear line in case input does not fill a line (EOF)
-			for(i = 30 ; i < 45; i++)		
+			for(i = 30 ; i < 45; i++)
 				{
 				text[i] = 0;
 				}
@@ -1975,7 +1996,7 @@ while(1)
 
 						break;
 						}
-					} 
+					}
 
 				if(c == 10) // LF, line feed
 					{
@@ -1987,7 +2008,7 @@ while(1)
 					// start again at top
 					i = 0;
 					line_cnt = 0;
-					
+
 					// clear screen
 					for(j = 0; j < 45; j++)
 						{
@@ -2007,20 +2028,20 @@ while(1)
 					if(i == 15) break;
 					}
 
-				}		
+				}
 
 			text[45] = 0;
 
 			// line feed
 			if(c == 10) continue;
-		
+
 			} /* end if scroll up */
 		else if(scroll_mode == SCROLL_DOWN)
 			{
 
 			/* copy down one line, make space */
 
-if(verbose) 
+if(verbose)
 	fprintf(stderr, "WAS A input_line_cnt=%d text=%s\n", input_line_cnt, text);
 			for(i = 0; i < 30 ; i++)
 				{
@@ -2033,7 +2054,7 @@ if(verbose)
 			/* read in new top line */
 
 			// clear line in case input does not fill a line (EOF)
-			for(i = 0 ; i < 15; i++)		
+			for(i = 0 ; i < 15; i++)
 				{
 				text[i] = 0;
 				}
@@ -2058,7 +2079,7 @@ if(verbose)
 
 						break;
 						}
-					} 
+					}
 
 				if(c == 10) // LF, line feed
 					{
@@ -2070,7 +2091,7 @@ if(verbose)
 					// start again at bottom
 					i = 0;
 					line_cnt = 0;
-					
+
 					// clear screen
 					for(j = 0; j < 45; j++)
 						{
@@ -2090,13 +2111,13 @@ if(verbose)
 					if(i == 15) break;
 					}
 
-				}		
+				}
 
 			text[45] = 0;
 
 			// line feed
 			if(c == 10) continue;
-			
+
 			} /* end if scroll down */
 		else if(scroll_mode == SCROLL_LEFT)
 			{
@@ -2111,11 +2132,11 @@ if(verbose)
 				else
 					{
 					text_flag = 1;
-				
+
 					continue;
 					}
 				}
-		
+
 			// font array boundary, replace non ASCII with blanks
 			if(c > 127) c = 0;
 
@@ -2130,13 +2151,10 @@ if(verbose)
 			text[46] = 0;
 			} /* end if scroll left */
 
-		} /* end while scan */	
+		} /* end while scan */
 	} /* end if loop_counter == scroll_delay */
 
 	// end v, h scroll processing
 
 exit(0);
 } /* end function main */
-
-
-
