@@ -124,6 +124,9 @@ Moved the i, l and : a bit more to the middle of the character space
 #define MATRIX_CHAR_WIDTH	8
 #define MATRIX_CHAR_HEIGHT	7
 
+/* Filename length */
+#define MAX_FILENAME_LEN 256
+
 static unsigned char matrixfont[128 * MATRIX_CHAR_HEIGHT]=
 {
 0b00000000,
@@ -967,13 +970,13 @@ static unsigned char matrixfont[128 * MATRIX_CHAR_HEIGHT]=
 0b01000100,
 0b01000100,
 /* 104 h */
-0b00010000,
+0b00001000,
 0b00000000,
-0b00110000,
-0b00010000,
-0b00010000,
-0b00010000,
-0b00111000,
+0b00011000,
+0b00001000,
+0b00001000,
+0b00001000,
+0b00011100,
 /* 105 i */
 0b00001000,
 0b00000000,
@@ -1538,7 +1541,7 @@ int line_cnt;
 int effect_mode;
 int input_line_cnt;
 int file_read_frequency;
-char filename[] = "";
+char filename[MAX_FILENAME_LEN];
 float fa;
 char fireworks_landscape[] = 	" * **  * *"; // landscape on bottom line, 15 characters wide, the control B is a christmass tree, use hexedit for example to make these strings
 char snow_landscape[] = 		" * **  * *";
@@ -1619,7 +1622,7 @@ while(1)
 			break;
     case 'f':
       file_flag = 1;
-      strncpy(filename, optarg, 20);
+      strncpy(filename, optarg, sizeof(filename) - 1);
       break;
 		case 'h': // help
 			print_usage();
